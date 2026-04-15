@@ -19,6 +19,9 @@
 			"import": "./dist/commands/index.js"
 		}
 	},
+	"publishConfig": {
+		"access": "public"
+	},
 	"files": [
 		"dist"
 	],
