@@ -1,7 +1,7 @@
 import type { BashExecResult } from "just-bash";
 import { Bash, InMemoryFs, MountableFs } from "just-bash";
 import { createTigrisCommands } from "./commands/index.js";
-import { TigrisFs } from "./fs/tigris-fs.js";
+import { TigrisObjectFs } from "./fs/tigris-object-fs.js";
 import type { ShellOptions, TigrisConfig } from "./types.js";
 
 /**
@@ -16,15 +16,15 @@ import type { ShellOptions, TigrisConfig } from "./types.js";
  */
 export class TigrisShell {
 	private readonly bash: Bash;
-	private readonly tigrisFs: TigrisFs;
+	private readonly objectFs: TigrisObjectFs;
 
 	constructor(config?: TigrisConfig, shellOptions?: ShellOptions) {
-		this.tigrisFs = new TigrisFs(config);
+		this.objectFs = new TigrisObjectFs(config);
 
 		const fs = new MountableFs({ base: new InMemoryFs() });
-		fs.mount("/workspace", this.tigrisFs);
+		fs.mount("/workspace", this.objectFs);
 
-		const tigrisCommands = createTigrisCommands(this.tigrisFs.config);
+		const tigrisCommands = createTigrisCommands(this.objectFs.config);
 
 		this.bash = new Bash({
 			fs,
@@ -41,7 +41,7 @@ export class TigrisShell {
 
 	/** Flush all cached writes to Tigris and delete removed objects. */
 	async flush(): Promise<void> {
-		return this.tigrisFs.flush();
+		return this.objectFs.flush();
 	}
 
 	/** Access the underlying just-bash instance. */
@@ -49,8 +49,8 @@ export class TigrisShell {
 		return this.bash;
 	}
 
-	/** Access the underlying TigrisFs instance. */
-	get fs(): TigrisFs {
-		return this.tigrisFs;
+	/** Access the underlying TigrisObjectFs instance. */
+	get fs(): TigrisObjectFs {
+		return this.objectFs;
 	}
 }

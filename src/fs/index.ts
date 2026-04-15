@@ -1,2 +1,2 @@
 export type { TigrisConfig } from "../types.js";
-export { TigrisFs } from "./tigris-fs.js";
+export { TigrisObjectFs } from "./tigris-object-fs.js";

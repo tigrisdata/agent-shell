@@ -1,6 +1,6 @@
 import { Bash, InMemoryFs, MountableFs } from "just-bash";
 import { createTigrisCommands } from "../src/commands/index.js";
-import { TigrisFs } from "../src/fs/tigris-fs.js";
+import { TigrisObjectFs } from "../src/fs/tigris-object-fs.js";
 
 async function main() {
 	const bucket1 = process.env.TIGRIS_STORAGE_BUCKET;
@@ -11,8 +11,8 @@ async function main() {
 	}
 
 	// Mount two different buckets at different paths
-	const workspaceFs = new TigrisFs({ bucket: bucket1 });
-	const datasetsFs = new TigrisFs({ bucket: bucket2 });
+	const workspaceFs = new TigrisObjectFs({ bucket: bucket1 });
+	const datasetsFs = new TigrisObjectFs({ bucket: bucket2 });
 
 	const fs = new MountableFs({ base: new InMemoryFs() });
 	fs.mount("/workspace", workspaceFs);
