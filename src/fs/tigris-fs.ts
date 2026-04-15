@@ -360,15 +360,32 @@ export class TigrisFs implements IFileSystem {
 	async flush(): Promise<void> {
 		const dirty = this.cache.getDirtyEntries();
 		const deleted = this.cache.getDeletedPaths();
+		const errors: Error[] = [];
 
 		await Promise.all(
 			dirty.map(({ path, entry }) => {
 				const body = typeof entry.content === "string" ? entry.content : Buffer.from(entry.content);
-				return put(this.toKey(path), body, { config: this.config });
+				return put(this.toKey(path), body, { config: this.config }).then((result) => {
+					if ("error" in result) {
+						errors.push(new Error(`flush put "${path}": ${result.error.message}`));
+					}
+				});
 			}),
 		);
 
-		await Promise.all(deleted.map((path) => remove(this.toKey(path), { config: this.config })));
+		await Promise.all(
+			deleted.map((path) =>
+				remove(this.toKey(path), { config: this.config }).then((result) => {
+					if ("error" in result) {
+						errors.push(new Error(`flush remove "${path}": ${result.error.message}`));
+					}
+				}),
+			),
+		);
+
+		if (errors.length > 0) {
+			throw new AggregateError(errors, `flush failed: ${errors.length} operation(s) failed`);
+		}
 
 		this.cache.markClean();
 	}
