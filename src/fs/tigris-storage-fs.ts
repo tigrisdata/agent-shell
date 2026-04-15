@@ -21,7 +21,7 @@ const DEFAULT_DIR_MODE = 0o755; // Placeholder — object storage has no POSIX p
  * - Reads check cache first, then fetch from Tigris on miss
  * - Deleted paths are tracked to avoid fetching removed objects
  */
-export class TigrisObjectFs implements IFileSystem {
+export class TigrisStorageFs implements IFileSystem {
 	private readonly cache = new FsCache();
 	readonly config: TigrisConfig;
 

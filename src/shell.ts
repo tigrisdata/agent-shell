@@ -1,7 +1,7 @@
 import type { BashExecResult } from "just-bash";
 import { Bash, InMemoryFs, MountableFs } from "just-bash";
 import { createTigrisCommands } from "./commands/index.js";
-import { TigrisObjectFs } from "./fs/tigris-object-fs.js";
+import { TigrisStorageFs } from "./fs/tigris-storage-fs.js";
 import type { ShellOptions, TigrisConfig } from "./types.js";
 
 /**
@@ -16,15 +16,15 @@ import type { ShellOptions, TigrisConfig } from "./types.js";
  */
 export class TigrisShell {
 	private readonly bash: Bash;
-	private readonly objectFs: TigrisObjectFs;
+	private readonly storageFs: TigrisStorageFs;
 
 	constructor(config?: TigrisConfig, shellOptions?: ShellOptions) {
-		this.objectFs = new TigrisObjectFs(config);
+		this.storageFs = new TigrisStorageFs(config);
 
 		const fs = new MountableFs({ base: new InMemoryFs() });
-		fs.mount("/workspace", this.objectFs);
+		fs.mount("/workspace", this.storageFs);
 
-		const tigrisCommands = createTigrisCommands(this.objectFs.config);
+		const tigrisCommands = createTigrisCommands(this.storageFs.config);
 
 		this.bash = new Bash({
 			fs,
@@ -41,7 +41,7 @@ export class TigrisShell {
 
 	/** Flush all cached writes to Tigris and delete removed objects. */
 	async flush(): Promise<void> {
-		return this.objectFs.flush();
+		return this.storageFs.flush();
 	}
 
 	/** Access the underlying just-bash instance. */
@@ -49,8 +49,8 @@ export class TigrisShell {
 		return this.bash;
 	}
 
-	/** Access the underlying TigrisObjectFs instance. */
-	get fs(): TigrisObjectFs {
-		return this.objectFs;
+	/** Access the underlying TigrisStorageFs instance. */
+	get fs(): TigrisStorageFs {
+		return this.storageFs;
 	}
 }

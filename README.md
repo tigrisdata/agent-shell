@@ -140,19 +140,19 @@ bundle file1.txt file2.txt --zstd           # Download as zstd tar
 
 ## Advanced: Compose with just-bash
 
-For more control, import `TigrisObjectFs` and the commands separately to build your own shell configuration. This is useful when you need multiple buckets mounted at different paths.
+For more control, import `TigrisStorageFs` and the commands separately to build your own shell configuration. This is useful when you need multiple buckets mounted at different paths.
 
 ```typescript
 import { Bash, MountableFs, InMemoryFs } from "just-bash";
-import { TigrisObjectFs } from "@tigrisdata/agent-shell/fs";
+import { TigrisStorageFs } from "@tigrisdata/agent-shell/fs";
 import { createTigrisCommands } from "@tigrisdata/agent-shell/commands";
 
 const config = { bucket: "agent-workspace" };
 
 // Build your own filesystem layout
 const fs = new MountableFs({ base: new InMemoryFs() });
-fs.mount("/workspace", new TigrisObjectFs(config));
-fs.mount("/datasets", new TigrisObjectFs({ bucket: "shared-datasets" }));
+fs.mount("/workspace", new TigrisStorageFs(config));
+fs.mount("/datasets", new TigrisStorageFs({ bucket: "shared-datasets" }));
 
 const bash = new Bash({
   fs,
@@ -168,7 +168,7 @@ await bash.exec("cp /datasets/training/labels.csv ./local-copy.csv");
 await bash.exec('echo "processed" > results.txt');
 
 // Flush a specific mount
-const workspaceFs = fs.getMount("/workspace") as TigrisObjectFs;
+const workspaceFs = fs.getMount("/workspace") as TigrisStorageFs;
 await workspaceFs.flush();
 ```
 
@@ -193,14 +193,14 @@ new TigrisShell(config?: TigrisConfig, shellOptions?: ShellOptions)
 | `exec(command)` | `Promise<BashExecResult>` | Execute a bash command          |
 | `flush()`       | `Promise<void>`           | Persist cached writes to Tigris |
 | `engine`        | `Bash`                    | Underlying just-bash instance   |
-| `fs`            | `TigrisObjectFs`                | Underlying filesystem instance  |
+| `fs`            | `TigrisStorageFs`         | Underlying filesystem instance  |
 
 ### `@tigrisdata/agent-shell/fs`
 
-| Export         | Description                                             |
-| -------------- | ------------------------------------------------------- |
-| `TigrisObjectFs`     | Filesystem class implementing just-bash's `IFileSystem` |
-| `TigrisConfig` | Same config type as main export                         |
+| Export            | Description                                             |
+| ----------------- | ------------------------------------------------------- |
+| `TigrisStorageFs` | Filesystem class implementing just-bash's `IFileSystem` |
+| `TigrisConfig`    | Same config type as main export                         |
 
 ### `@tigrisdata/agent-shell/commands`
 

@@ -141,7 +141,7 @@ describe("TigrisShell", () => {
 	});
 
 	describe("flush", () => {
-		it("delegates to TigrisObjectFs.flush", async () => {
+		it("delegates to TigrisStorageFs.flush", async () => {
 			vi.mocked(put).mockResolvedValue(mockPutResponse());
 
 			const shell = new TigrisShell({ bucket: "test" });
