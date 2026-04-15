@@ -1,7 +1,7 @@
 import type { BashExecResult } from "just-bash";
 import { Bash, InMemoryFs, MountableFs } from "just-bash";
 import { createTigrisCommands } from "./commands/index.js";
-import { TigrisStorageFs } from "./fs/tigris-storage-fs.js";
+import { TigrisAdapter } from "./fs/tigris-adapter.js";
 import type { ShellOptions, TigrisConfig } from "./types.js";
 
 /**
@@ -16,15 +16,15 @@ import type { ShellOptions, TigrisConfig } from "./types.js";
  */
 export class TigrisShell {
 	private readonly bash: Bash;
-	private readonly storageFs: TigrisStorageFs;
+	private readonly adapter: TigrisAdapter;
 
 	constructor(config?: TigrisConfig, shellOptions?: ShellOptions) {
-		this.storageFs = new TigrisStorageFs(config);
+		this.adapter = new TigrisAdapter(config);
 
 		const fs = new MountableFs({ base: new InMemoryFs() });
-		fs.mount("/workspace", this.storageFs);
+		fs.mount("/workspace", this.adapter);
 
-		const tigrisCommands = createTigrisCommands(this.storageFs.config);
+		const tigrisCommands = createTigrisCommands(this.adapter.config);
 
 		this.bash = new Bash({
 			fs,
@@ -41,7 +41,7 @@ export class TigrisShell {
 
 	/** Flush all cached writes to Tigris and delete removed objects. */
 	async flush(): Promise<void> {
-		return this.storageFs.flush();
+		return this.adapter.flush();
 	}
 
 	/** Access the underlying just-bash instance. */
@@ -49,8 +49,8 @@ export class TigrisShell {
 		return this.bash;
 	}
 
-	/** Access the underlying TigrisStorageFs instance. */
-	get fs(): TigrisStorageFs {
-		return this.storageFs;
+	/** Access the underlying TigrisAdapter instance. */
+	get fs(): TigrisAdapter {
+		return this.adapter;
 	}
 }

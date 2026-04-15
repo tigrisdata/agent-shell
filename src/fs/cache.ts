@@ -1,5 +1,5 @@
 /**
- * In-memory write-back cache for TigrisStorageFs.
+ * In-memory write-back cache for TigrisAdapter.
  *
  * Writes stay local until explicitly flushed. Reads check cache first,
  * then fall through to the remote backend on miss.
