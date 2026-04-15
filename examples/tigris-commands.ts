@@ -1,7 +1,8 @@
 import { TigrisShell } from "../src/index.js";
 
 async function main() {
-	const bucket = "ai-agent-shell-test-2";
+	const bucket = process.env.TIGRIS_STORAGE_BUCKET;
+
 	if (!bucket) {
 		console.error("Set TIGRIS_STORAGE_BUCKET env var");
 		process.exit(1);

@@ -3,9 +3,16 @@ import { createTigrisCommands } from "../src/commands/index.js";
 import { TigrisFs } from "../src/fs/tigris-fs.js";
 
 async function main() {
+	const bucket1 = process.env.TIGRIS_STORAGE_BUCKET;
+	const bucket2 = process.env.TIGRIS_STORAGE_BUCKET_2;
+	if (!bucket1 || !bucket2) {
+		console.error("Set TIGRIS_STORAGE_BUCKET and TIGRIS_STORAGE_BUCKET_2 env vars");
+		process.exit(1);
+	}
+
 	// Mount two different buckets at different paths
-	const workspaceFs = new TigrisFs({ bucket: "ai-agent-shell-test" });
-	const datasetsFs = new TigrisFs({ bucket: "ai-agent-shell-test-2" });
+	const workspaceFs = new TigrisFs({ bucket: bucket1 });
+	const datasetsFs = new TigrisFs({ bucket: bucket2 });
 
 	const fs = new MountableFs({ base: new InMemoryFs() });
 	fs.mount("/workspace", workspaceFs);
