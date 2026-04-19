@@ -19,6 +19,7 @@ export class ShellLoop {
 	private shell: TigrisShell | null = null;
 	private bash: Bash;
 	private terminal: Terminal;
+	private busy = false;
 
 	constructor(terminal: Terminal, bash: Bash) {
 		this.terminal = terminal;
@@ -37,6 +38,9 @@ export class ShellLoop {
 	}
 
 	private async handleInput(data: string) {
+		// Block input while a command is executing
+		if (this.busy) return;
+
 		if (data === "\r") {
 			this.terminal.write("\r\n");
 			const line = this.currentLine.trim();
@@ -44,7 +48,9 @@ export class ShellLoop {
 			if (line) {
 				this.history.push(line);
 				this.historyIndex = this.history.length;
+				this.busy = true;
 				await this.execute(line);
+				this.busy = false;
 			}
 
 			this.prompt();
@@ -131,7 +137,9 @@ export class ShellLoop {
 			return;
 		}
 
-		if (command.startsWith("configure")) {
+		const firstToken = command.split(/\s+/)[0];
+
+		if (firstToken === "configure") {
 			this.handleConfigure(command);
 			return;
 		}
