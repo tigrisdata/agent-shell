@@ -4,11 +4,6 @@ export default defineConfig({
 	root: ".",
 	build: {
 		outDir: "dist",
-		rollupOptions: {
-			// Stub Node.js built-ins that just-bash's browser bundle references
-			// but doesn't actually use at runtime for core operations
-			external: [],
-		},
 	},
 	resolve: {
 		alias: {
