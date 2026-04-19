@@ -204,7 +204,7 @@ export class ShellLoop {
 		this.writeOutput(
 			`${YELLOW}WARNING: Credentials are stored in browser memory only.${RESET}\r\n`,
 		);
-		this.writeOutput(`${YELLOW}They will be lost when you close this tab.${RESET}\r\n`);
+		this.writeOutput(`${YELLOW}They will be lost when you close or refresh this tab.${RESET}\r\n`);
 		this.writeOutput("\r\n");
 		this.writeOutput(`${DIM}Commands available: flush, presign, snapshot, fork${RESET}\r\n`);
 		this.writeOutput(`${DIM}Use $BUCKET in commands, e.g.: snapshot $BUCKET --list${RESET}\r\n`);

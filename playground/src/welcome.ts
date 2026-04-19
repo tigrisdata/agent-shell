@@ -15,8 +15,9 @@ export function showWelcome(terminal: Terminal) {
 	terminal.writeln(
 		`${YELLOW}are stored in browser memory only and never sent to any server${RESET}`,
 	);
-	terminal.writeln(`${YELLOW}other than Tigris (t3.storage.dev). Do not use on shared or${RESET}`);
-	terminal.writeln(`${YELLOW}untrusted devices.${RESET}`);
+	terminal.writeln(
+		`${YELLOW}other than Tigris. Do not use on shared or untrusted devices.${RESET}`,
+	);
 	terminal.writeln("");
 	terminal.writeln(`${DIM}Connect to Tigris:${RESET}`);
 	terminal.writeln(
