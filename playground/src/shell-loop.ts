@@ -212,6 +212,7 @@ export class ShellLoop {
 		this.shell = new TigrisShell(config, {
 			env: { BUCKET: bucket },
 		});
+		this.cwd = undefined;
 
 		this.writeOutput(`${GREEN}Connected to bucket: ${bucket}${RESET}\r\n`);
 		this.writeOutput("\r\n");
