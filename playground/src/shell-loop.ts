@@ -217,8 +217,13 @@ export class ShellLoop {
 	}
 
 	private async handleFlush() {
+		if (!this.shell) {
+			this.writeOutput(`${RED}Not configured. Run 'configure' first.${RESET}\r\n`);
+			return;
+		}
+
 		try {
-			await this.shell?.flush();
+			await this.shell.flush();
 			const creds = getCredentials();
 			this.writeOutput(`${GREEN}Flushed to bucket: ${creds?.bucket}${RESET}\r\n`);
 		} catch (err) {
