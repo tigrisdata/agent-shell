@@ -9,8 +9,10 @@
 	},
 	"dependencies": {
 		"@tigrisdata/agent-shell": "^0.1.2",
+		"@tigrisdata/storage": "^3.1.1",
 		"@xterm/addon-fit": "^0.10.0",
-		"@xterm/xterm": "^5.5.0"
+		"@xterm/xterm": "^5.5.0",
+		"just-bash": "^2.14.2"
 	},
 	"devDependencies": {
 		"typescript": "~5.8.0",
