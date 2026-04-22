@@ -1,6 +1,7 @@
 import type { ReplIO } from "@tigrisdata/agent-shell/repl";
 import { ReplSession } from "@tigrisdata/agent-shell/repl";
 import type { Terminal } from "@xterm/xterm";
+import { browserLogin } from "./auth.js";
 
 const PROMPT = "\x1b[32m$ \x1b[0m";
 
@@ -18,10 +19,11 @@ export class ShellLoop {
 	private session: ReplSession;
 	private busy = false;
 	private pendingPromptResolve: ((value: string) => void) | null = null;
+	private pendingPromptText = "";
 
 	constructor(terminal: Terminal) {
 		this.terminal = terminal;
-		this.session = new ReplSession();
+		this.session = new ReplSession({ loginFn: browserLogin });
 	}
 
 	start() {
@@ -36,6 +38,9 @@ export class ShellLoop {
 			},
 			prompt: (message: string) => {
 				this.terminal.write(message.replace(/\r?\n/g, "\r\n"));
+				// Store only the last line for redrawing (strip leading newlines)
+				const lines = message.split(/\r?\n/);
+				this.pendingPromptText = lines[lines.length - 1] ?? "";
 				return new Promise<string>((resolve) => {
 					this.pendingPromptResolve = resolve;
 				});
@@ -62,6 +67,7 @@ export class ShellLoop {
 			if (this.pendingPromptResolve) {
 				const resolve = this.pendingPromptResolve;
 				this.pendingPromptResolve = null;
+				this.pendingPromptText = "";
 				resolve(line);
 				return;
 			}
@@ -95,11 +101,14 @@ export class ShellLoop {
 		}
 
 		if (data === "\x03") {
-			this.terminal.write("^C");
+			this.terminal.write("^C\r\n");
 			if (this.pendingPromptResolve) {
 				const resolve = this.pendingPromptResolve;
 				this.pendingPromptResolve = null;
+				this.pendingPromptText = "";
 				resolve("");
+				// Don't prompt here — the session flow will resume and prompt when done
+				return;
 			}
 			this.prompt();
 			return;
@@ -107,7 +116,8 @@ export class ShellLoop {
 
 		if (data === "\x0c") {
 			this.terminal.clear();
-			this.terminal.write(PROMPT + this.currentLine);
+			const prefix = this.pendingPromptResolve ? this.pendingPromptText : PROMPT;
+			this.terminal.write(prefix + this.currentLine);
 			return;
 		}
 
@@ -160,7 +170,8 @@ export class ShellLoop {
 	}
 
 	private redrawLine() {
-		this.terminal.write(`\r\x1b[K${PROMPT}${this.currentLine}`);
+		const prefix = this.pendingPromptResolve ? this.pendingPromptText : PROMPT;
+		this.terminal.write(`\r\x1b[K${prefix}${this.currentLine}`);
 		const back = this.currentLine.length - this.cursorPos;
 		if (back > 0) {
 			this.terminal.write(`\x1b[${back}D`);
