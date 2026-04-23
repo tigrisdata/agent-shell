@@ -33,6 +33,14 @@ export interface ShellOptions {
 	env?: Record<string, string>;
 }
 
+/** Return a new config with defaults applied. */
+export function withConfigDefaults(config: TigrisConfig): TigrisConfig {
+	return {
+		forcePathStyle: true,
+		...config,
+	};
+}
+
 /**
  * Validates that TigrisConfig has at least one auth mode.
  * Throws if neither access key nor session token auth is provided.
@@ -45,10 +53,5 @@ export function validateConfig(config: TigrisConfig): void {
 		throw new Error(
 			"TigrisConfig requires either (accessKeyId + secretAccessKey) or (sessionToken + organizationId)",
 		);
-	}
-
-	// Default to path-style URLs
-	if (config.forcePathStyle === undefined) {
-		config.forcePathStyle = true;
 	}
 }
