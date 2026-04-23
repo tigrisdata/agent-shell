@@ -19,6 +19,8 @@ export interface TigrisConfig {
 	bucket?: string;
 	/** Tigris endpoint. Defaults to https://t3.storage.dev */
 	endpoint?: string;
+	/** Use path-style URLs (endpoint/bucket/key) instead of virtual-hosted (bucket.endpoint/key). */
+	forcePathStyle?: boolean;
 }
 
 /**
@@ -43,5 +45,10 @@ export function validateConfig(config: TigrisConfig): void {
 		throw new Error(
 			"TigrisConfig requires either (accessKeyId + secretAccessKey) or (sessionToken + organizationId)",
 		);
+	}
+
+	// Default to path-style URLs
+	if (config.forcePathStyle === undefined) {
+		config.forcePathStyle = true;
 	}
 }

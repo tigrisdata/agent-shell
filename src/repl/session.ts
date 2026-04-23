@@ -121,6 +121,9 @@ export class ReplSession {
 		authMethod: "access-key" | "oauth",
 		io: ReplIO,
 	): Promise<void> {
+		if (newConfig.forcePathStyle === undefined) {
+			newConfig.forcePathStyle = true;
+		}
 		const bucketsResult = await listBuckets({ config: newConfig });
 		if ("error" in bucketsResult) {
 			const newShell = new TigrisShell(newConfig);
