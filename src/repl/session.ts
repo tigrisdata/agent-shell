@@ -81,7 +81,7 @@ export class ReplSession {
 			});
 
 			if (result.env?.PWD) {
-				this.cwd = result.env.PWD;
+				this.cwd = result.env.PWD.replace(/\/\/+/g, "/");
 			}
 
 			if (result.stdout) io.write(result.stdout);
