@@ -27,26 +27,6 @@ function parsePresignArgs(args: string[]): {
 	return { expiresIn, operation };
 }
 
-/** Resolve an absolute path to { bucket, key } using mount lookup. */
-function resolvePath(
-	absolutePath: string,
-	configBucket: string | undefined,
-	resolveBucket?: (path: string) => { bucket: string; key: string } | null,
-): { bucket: string; key: string } | null {
-	// Static bucket from config — strip leading slash for key
-	if (configBucket) {
-		const key = absolutePath.startsWith("/") ? absolutePath.slice(1) : absolutePath;
-		return { bucket: configBucket, key };
-	}
-
-	// Dynamic resolution from mounts
-	if (resolveBucket) {
-		return resolveBucket(absolutePath);
-	}
-
-	return null;
-}
-
 export interface PresignOptions {
 	/** Resolve an absolute path to bucket + key from the mount table. */
 	resolveBucket?: (path: string) => { bucket: string; key: string } | null;
@@ -71,12 +51,18 @@ export function createPresignCommand(config: TigrisConfig, options?: PresignOpti
 			};
 		}
 
-		// Resolve relative paths against cwd
-		const absolutePath = rawPath.startsWith("/")
-			? rawPath
-			: `${ctx.cwd.replace(/\/$/, "")}/${rawPath}`;
-
-		const resolved = resolvePath(absolutePath, config.bucket, options?.resolveBucket);
+		let resolved: { bucket: string; key: string } | null;
+		if (config.bucket) {
+			// Single-bucket mode — rawPath is relative to the bucket root
+			const key = rawPath.startsWith("/") ? rawPath.slice(1) : rawPath;
+			resolved = { bucket: config.bucket, key };
+		} else {
+			// Multi-bucket — resolve against cwd to find the mount
+			const absolutePath = rawPath.startsWith("/")
+				? rawPath
+				: `${ctx.cwd.replace(/\/$/, "")}/${rawPath}`;
+			resolved = options?.resolveBucket?.(absolutePath) ?? null;
+		}
 		if (!resolved) {
 			return {
 				stdout: "",
