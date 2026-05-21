@@ -1,4 +1,4 @@
-import { createBucket, listBuckets } from "@tigrisdata/storage";
+import { createBucket, listForks } from "@tigrisdata/storage";
 import { defineCommand } from "just-bash";
 import type { TigrisConfig } from "../types.js";
 
@@ -65,7 +65,7 @@ export function createForksListCommand(config: TigrisConfig) {
 			};
 		}
 
-		const result = await listBuckets({ config });
+		const result = await listForks(bucket, { config });
 		if ("error" in result) {
 			return {
 				stdout: "",
@@ -74,7 +74,7 @@ export function createForksListCommand(config: TigrisConfig) {
 			};
 		}
 
-		const lines = result.data.buckets.map((b) => b.name).join("\n");
+		const lines = result.data.forks.map((b) => b.name).join("\n");
 		return {
 			stdout: lines ? `${lines}\n` : "",
 			stderr: "",

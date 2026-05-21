@@ -5,7 +5,7 @@ vi.mock("@tigrisdata/storage", () => ({
 	createBucketSnapshot: vi.fn(),
 	listBucketSnapshots: vi.fn(),
 	createBucket: vi.fn(),
-	listBuckets: vi.fn(),
+	listForks: vi.fn(),
 }));
 
 import {
@@ -13,8 +13,9 @@ import {
 	createBucketSnapshot,
 	getPresignedUrl,
 	listBucketSnapshots,
-	listBuckets,
+	listForks,
 } from "@tigrisdata/storage";
+import { EMPTY_BYTES } from "just-bash";
 import { createForkCommand, createForksListCommand } from "../src/commands/fork.js";
 import { createPresignCommand } from "../src/commands/presign.js";
 import { createSnapshotCommand } from "../src/commands/snapshot.js";
@@ -28,7 +29,7 @@ function makeCtx() {
 		fs: {} as never,
 		cwd: "/",
 		env: new Map<string, string>(),
-		stdin: "",
+		stdin: EMPTY_BYTES,
 	};
 }
 
@@ -190,14 +191,26 @@ describe("forks", () => {
 		expect(result.stderr).toContain("missing bucket");
 	});
 
-	it("lists buckets", async () => {
-		vi.mocked(listBuckets).mockResolvedValue({
+	it("lists forks", async () => {
+		const now = new Date();
+		vi.mocked(listForks).mockResolvedValue({
 			data: {
-				buckets: [
-					{ name: "bucket-a", creationDate: new Date() },
-					{ name: "bucket-b", creationDate: new Date() },
+				forks: [
+					{
+						name: "bucket-a",
+						creationDate: now,
+						forkCreatedAt: now,
+						snapshot: "snap-a",
+						snapshotCreatedAt: now,
+					},
+					{
+						name: "bucket-b",
+						creationDate: now,
+						forkCreatedAt: now,
+						snapshot: "snap-b",
+						snapshotCreatedAt: now,
+					},
 				],
-				owner: { name: "test", id: "1" },
 			},
 		});
 
