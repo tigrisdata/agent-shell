@@ -82,15 +82,12 @@ describe("computeCompletions", () => {
 			expect(hits).toEqual(["alpha"]);
 		});
 
-		it("completes bucket names for 'fork' and 'forks'", async () => {
+		it("completes bucket names for 'fork'", async () => {
 			const shell = new TigrisShell(TEST_CONFIG);
 			shell.mount("alpha", "/a");
 
 			const [forkHits] = await computeCompletions("fork ", { shell, cwd: undefined });
 			expect(forkHits).toEqual(["alpha"]);
-
-			const [forksHits] = await computeCompletions("forks ", { shell, cwd: undefined });
-			expect(forksHits).toEqual(["alpha"]);
 		});
 
 		it("falls back to path completion for the second arg of mount", async () => {

@@ -1,72 +1,68 @@
 import { createBucketSnapshot, listBucketSnapshots } from "@tigrisdata/storage";
-import { defineCommand } from "just-bash";
+import { defineCommand, type ExecResult } from "just-bash";
 import type { TigrisConfig } from "../types.js";
+import { argError, type FlagSchema, parseFlags, sdkError } from "./args.js";
 
-/**
- * snapshot <bucket> [--name label] [--list]
- *
- * Create or list point-in-time bucket snapshots.
- */
-function parseSnapshotArgs(args: string[]): {
-	isList: boolean;
+const USAGE = "snapshot <bucket> [--name label] [--list]";
+const SCHEMA: FlagSchema = {
+	"--name": "value",
+	"--list": "boolean",
+};
+
+interface SnapshotInput {
+	bucket: string;
+	mode: "list" | "create";
 	name: string | undefined;
-} {
-	let isList = false;
-	let name: string | undefined;
-
-	for (let i = 0; i < args.length; i++) {
-		if (args[i] === "--list") {
-			isList = true;
-		} else if (args[i] === "--name" && args[i + 1]) {
-			name = args[i + 1];
-			i++;
-		}
-	}
-
-	return { isList, name };
-}
-
-async function listSnapshots(bucket: string, config: TigrisConfig) {
-	const result = await listBucketSnapshots(bucket, { config });
-	if ("error" in result) {
-		return { stdout: "", stderr: `snapshot: ${result.error.message}\n`, exitCode: 1 };
-	}
-	const lines = result.data.snapshots
-		.map((s) => {
-			const label = s.name ? ` (${s.name})` : "";
-			const date = s.creationDate?.toISOString() ?? "unknown";
-			return `${s.version}${label}  ${date}`;
-		})
-		.join("\n");
-	return { stdout: lines ? `${lines}\n` : "", stderr: "", exitCode: 0 };
 }
 
 export function createSnapshotCommand(config: TigrisConfig) {
 	return defineCommand("snapshot", async (args) => {
-		const bucket = args[0];
-		if (!bucket) {
-			return {
-				stdout: "",
-				stderr:
-					"snapshot: missing bucket argument\nUsage: snapshot <bucket> [--name label] [--list]\n",
-				exitCode: 1,
-			};
-		}
+		const input = parseInput(args);
+		if ("stderr" in input) return input;
 
-		const { isList, name } = parseSnapshotArgs(args.slice(1));
+		if (input.mode === "list") return listSnapshots(input.bucket, config);
 
-		if (isList) {
-			return listSnapshots(bucket, config);
-		}
-
-		const result = await createBucketSnapshot(bucket, {
-			...(name !== undefined && { name }),
+		const result = await createBucketSnapshot(input.bucket, {
+			...(input.name !== undefined && { name: input.name }),
 			config,
 		});
-		if ("error" in result) {
-			return { stdout: "", stderr: `snapshot: ${result.error.message}\n`, exitCode: 1 };
-		}
+		if ("error" in result) return sdkError("snapshot", result.error);
 
 		return { stdout: `${result.data.snapshotVersion}\n`, stderr: "", exitCode: 0 };
 	});
+}
+
+function parseInput(args: string[]): SnapshotInput | ExecResult {
+	const parsed = parseFlags(args, SCHEMA);
+	if ("error" in parsed) return argError("snapshot", parsed.error, USAGE);
+	const { flags, positional } = parsed;
+
+	if (positional.length === 0) return argError("snapshot", "missing <bucket>", USAGE);
+	if (positional.length > 1) {
+		return argError("snapshot", `unexpected argument: ${positional[1]}`, USAGE);
+	}
+
+	const isList = flags["--list"] === true;
+	const name = typeof flags["--name"] === "string" ? flags["--name"] : undefined;
+	if (isList && name !== undefined) {
+		return argError("snapshot", "--name and --list cannot be combined", USAGE);
+	}
+
+	return { bucket: positional[0] ?? "", mode: isList ? "list" : "create", name };
+}
+
+async function listSnapshots(bucket: string, config: TigrisConfig) {
+	const result = await listBucketSnapshots(bucket, { config });
+	if ("error" in result) return sdkError("snapshot", result.error);
+
+	const snapshots = result.data.snapshots;
+	if (snapshots.length === 0) {
+		return { stdout: "No snapshots.\n", stderr: "", exitCode: 0 };
+	}
+	const lines = snapshots.map((s) => {
+		const label = s.name ? ` (${s.name})` : "";
+		const date = s.creationDate?.toISOString() ?? "unknown";
+		return `${s.version}${label}  ${date}`;
+	});
+	return { stdout: `${lines.join("\n")}\n`, stderr: "", exitCode: 0 };
 }

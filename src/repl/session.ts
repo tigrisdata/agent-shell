@@ -416,7 +416,7 @@ export class ReplSession {
 		io.write("  presign <path> [--expires N] [--put]          Generate a presigned URL\n");
 		io.write("  snapshot <bucket> [--name N] [--list]         Create or list snapshots\n");
 		io.write("  fork <source> <name> [--snapshot V]           Fork a bucket\n");
-		io.write("  forks <bucket>                                List forks\n");
+		io.write("  fork <source> --list                          List forks\n");
 		io.write("\nShell:\n");
 		io.write("  clear                                         Clear screen\n");
 		io.write("  help                                          Show this help\n");

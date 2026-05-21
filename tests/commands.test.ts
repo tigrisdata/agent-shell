@@ -16,7 +16,7 @@ import {
 	listForks,
 } from "@tigrisdata/storage";
 import { EMPTY_BYTES } from "just-bash";
-import { createForkCommand, createForksListCommand } from "../src/commands/fork.js";
+import { createForkCommand } from "../src/commands/fork.js";
 import { createPresignCommand } from "../src/commands/presign.js";
 import { createSnapshotCommand } from "../src/commands/snapshot.js";
 import { TEST_CONFIG_WITH_BUCKET } from "./helpers.js";
@@ -43,7 +43,38 @@ describe("presign", () => {
 	it("returns error when path is missing", async () => {
 		const result = await cmd.execute([], makeCtx());
 		expect(result.exitCode).toBe(1);
-		expect(result.stderr).toContain("missing path");
+		expect(result.stderr).toContain("missing <path>");
+		expect(result.stderr).toContain("Usage: presign");
+	});
+
+	it("rejects unknown options", async () => {
+		const result = await cmd.execute(["/f.txt", "--exires", "60"], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("unknown option: --exires");
+	});
+
+	it("rejects extra positional args", async () => {
+		const result = await cmd.execute(["/a.txt", "/b.txt"], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("unexpected argument: /b.txt");
+	});
+
+	it("rejects --expires without a value", async () => {
+		const result = await cmd.execute(["/f.txt", "--expires"], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("--expires requires a value");
+	});
+
+	it("rejects non-numeric --expires", async () => {
+		const result = await cmd.execute(["/f.txt", "--expires", "abc"], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("--expires must be a positive integer");
+	});
+
+	it("rejects non-positive --expires", async () => {
+		const result = await cmd.execute(["/f.txt", "--expires", "-1"], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("--expires must be a positive integer");
 	});
 
 	it("generates a GET presigned URL", async () => {
@@ -90,7 +121,36 @@ describe("snapshot", () => {
 	it("returns error when bucket is missing", async () => {
 		const result = await cmd.execute([], makeCtx());
 		expect(result.exitCode).toBe(1);
-		expect(result.stderr).toContain("missing bucket");
+		expect(result.stderr).toContain("missing <bucket>");
+		expect(result.stderr).toContain("Usage: snapshot");
+	});
+
+	it("rejects unknown options", async () => {
+		const result = await cmd.execute(["b", "--label", "v1"], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("unknown option: --label");
+	});
+
+	it("rejects --name and --list together", async () => {
+		const result = await cmd.execute(["b", "--list", "--name", "v1"], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("--name and --list cannot be combined");
+	});
+
+	it("rejects extra positional args", async () => {
+		const result = await cmd.execute(["b", "extra"], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("unexpected argument: extra");
+	});
+
+	it("prints 'No snapshots.' when listing is empty", async () => {
+		vi.mocked(listBucketSnapshots).mockResolvedValue({
+			data: { snapshots: [] },
+		});
+
+		const result = await cmd.execute(["my-bucket", "--list"], makeCtx());
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout).toContain("No snapshots.");
 	});
 
 	it("creates a snapshot", async () => {
@@ -144,10 +204,34 @@ describe("snapshot", () => {
 describe("fork", () => {
 	const cmd = createForkCommand(config);
 
-	it("returns error when arguments are missing", async () => {
+	it("returns error when source bucket is missing", async () => {
+		const result = await cmd.execute([], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("missing <source-bucket>");
+	});
+
+	it("returns error when fork name is missing", async () => {
 		const result = await cmd.execute(["source-only"], makeCtx());
 		expect(result.exitCode).toBe(1);
-		expect(result.stderr).toContain("missing arguments");
+		expect(result.stderr).toContain("missing <fork-name>");
+	});
+
+	it("rejects source == name", async () => {
+		const result = await cmd.execute(["same", "same"], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("must differ");
+	});
+
+	it("rejects unknown options", async () => {
+		const result = await cmd.execute(["a", "b", "--snap", "v"], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("unknown option: --snap");
+	});
+
+	it("rejects extra positional args", async () => {
+		const result = await cmd.execute(["a", "b", "c"], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("unexpected argument: c");
 	});
 
 	it("creates a fork", async () => {
@@ -180,43 +264,61 @@ describe("fork", () => {
 		expect(result.exitCode).toBe(1);
 		expect(result.stderr).toContain("already exists");
 	});
-});
 
-describe("forks", () => {
-	const cmd = createForksListCommand(config);
-
-	it("returns error when bucket is missing", async () => {
-		const result = await cmd.execute([], makeCtx());
-		expect(result.exitCode).toBe(1);
-		expect(result.stderr).toContain("missing bucket");
-	});
-
-	it("lists forks", async () => {
-		const now = new Date();
-		vi.mocked(listForks).mockResolvedValue({
-			data: {
-				forks: [
-					{
-						name: "bucket-a",
-						creationDate: now,
-						forkCreatedAt: now,
-						snapshot: "snap-a",
-						snapshotCreatedAt: now,
-					},
-					{
-						name: "bucket-b",
-						creationDate: now,
-						forkCreatedAt: now,
-						snapshot: "snap-b",
-						snapshotCreatedAt: now,
-					},
-				],
-			},
+	describe("--list", () => {
+		it("returns error when source bucket is missing", async () => {
+			const result = await cmd.execute(["--list"], makeCtx());
+			expect(result.exitCode).toBe(1);
+			expect(result.stderr).toContain("missing <source-bucket>");
 		});
 
-		const result = await cmd.execute(["my-bucket"], makeCtx());
-		expect(result.exitCode).toBe(0);
-		expect(result.stdout).toContain("bucket-a");
-		expect(result.stdout).toContain("bucket-b");
+		it("rejects extra positional args", async () => {
+			const result = await cmd.execute(["a", "b", "--list"], makeCtx());
+			expect(result.exitCode).toBe(1);
+			expect(result.stderr).toContain("unexpected argument: b");
+		});
+
+		it("rejects --snapshot + --list", async () => {
+			const result = await cmd.execute(["a", "--list", "--snapshot", "v1"], makeCtx());
+			expect(result.exitCode).toBe(1);
+			expect(result.stderr).toContain("--snapshot and --list cannot be combined");
+		});
+
+		it("prints 'No forks.' when listing is empty", async () => {
+			vi.mocked(listForks).mockResolvedValue({ data: { forks: [] } });
+
+			const result = await cmd.execute(["my-bucket", "--list"], makeCtx());
+			expect(result.exitCode).toBe(0);
+			expect(result.stdout).toContain("No forks.");
+		});
+
+		it("lists forks", async () => {
+			const now = new Date();
+			vi.mocked(listForks).mockResolvedValue({
+				data: {
+					forks: [
+						{
+							name: "bucket-a",
+							creationDate: now,
+							forkCreatedAt: now,
+							snapshot: "snap-a",
+							snapshotCreatedAt: now,
+						},
+						{
+							name: "bucket-b",
+							creationDate: now,
+							forkCreatedAt: now,
+							snapshot: "snap-b",
+							snapshotCreatedAt: now,
+						},
+					],
+				},
+			});
+
+			const result = await cmd.execute(["my-bucket", "--list"], makeCtx());
+			expect(result.exitCode).toBe(0);
+			expect(result.stdout).toContain("bucket-a");
+			expect(result.stdout).toContain("bucket-b");
+		});
 	});
 });

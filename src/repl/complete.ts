@@ -18,9 +18,9 @@ const REPL_COMMANDS = [
 	"quit",
 ];
 
-const CUSTOM_COMMANDS = ["presign", "snapshot", "fork", "forks"];
+const CUSTOM_COMMANDS = ["presign", "snapshot", "fork"];
 
-const BUCKET_ARG_COMMANDS = new Set(["mount", "snapshot", "fork", "forks"]);
+const BUCKET_ARG_COMMANDS = new Set(["mount", "snapshot", "fork"]);
 const MOUNT_POINT_ARG_COMMANDS = new Set(["umount", "flush"]);
 
 export interface CompleteContext {
