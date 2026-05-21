@@ -37,6 +37,6 @@
 		}
 	},
 	"files": {
-		"includes": ["**", "!**/dist", "!**/node_modules", "!**/coverage"]
+		"includes": ["**", "!**/dist", "!**/node_modules", "!**/coverage", "!**/.claude"]
 	}
 }

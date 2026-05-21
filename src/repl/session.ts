@@ -3,6 +3,7 @@ import type { BashExecResult } from "just-bash";
 import { TigrisShell } from "../shell.js";
 import { type TigrisConfig, withConfigDefaults } from "../types.js";
 import type { LoginFn } from "./auth.js";
+import { computeCompletions } from "./complete.js";
 import type { ReplIO } from "./io.js";
 
 export interface ReplSessionOptions {
@@ -426,6 +427,14 @@ export class ReplSession {
 	/** Whether a shell is configured and ready. */
 	get isConfigured(): boolean {
 		return this.shell !== null;
+	}
+
+	/**
+	 * Tab-completion entry point. Returns `[hits, completedToken]` in the
+	 * shape that node:readline expects.
+	 */
+	async complete(line: string): Promise<[string[], string]> {
+		return computeCompletions(line, { shell: this.shell, cwd: this.cwd });
 	}
 
 	/** Get the current prompt string (e.g. "/my-bucket $ "). */
