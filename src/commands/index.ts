@@ -11,7 +11,9 @@ export function createTigrisCommands(config: TigrisConfig): Command[] {
 	return [createPresignCommand(config), createSnapshotCommand(config), createForkCommand(config)];
 }
 
+export type { ForkOptions } from "./fork.js";
 export { createForkCommand } from "./fork.js";
 export type { PresignOptions } from "./presign.js";
 export { createPresignCommand } from "./presign.js";
+export type { SnapshotOptions } from "./snapshot.js";
 export { createSnapshotCommand } from "./snapshot.js";

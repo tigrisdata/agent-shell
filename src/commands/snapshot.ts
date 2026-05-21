@@ -3,11 +3,16 @@ import { defineCommand, type ExecResult } from "just-bash";
 import type { TigrisConfig } from "../types.js";
 import { argError, type FlagSchema, parseFlags, sdkError } from "./args.js";
 
-const USAGE = "snapshot <bucket> [--name label] [--list]";
+const USAGE = "snapshot [<bucket>] [--name label] [--list]";
 const SCHEMA: FlagSchema = {
 	"--name": "value",
 	"--list": "boolean",
 };
+
+export interface SnapshotOptions {
+	/** Resolve cwd to a mounted bucket so <bucket> can be omitted. */
+	resolveBucket?: (path: string) => { bucket: string; key: string } | null;
+}
 
 interface SnapshotInput {
 	bucket: string;
@@ -15,9 +20,9 @@ interface SnapshotInput {
 	name: string | undefined;
 }
 
-export function createSnapshotCommand(config: TigrisConfig) {
-	return defineCommand("snapshot", async (args) => {
-		const input = parseInput(args);
+export function createSnapshotCommand(config: TigrisConfig, options?: SnapshotOptions) {
+	return defineCommand("snapshot", async (args, ctx) => {
+		const input = parseInput(args, ctx.cwd, options);
 		if ("stderr" in input) return input;
 
 		if (input.mode === "list") return listSnapshots(input.bucket, config);
@@ -32,12 +37,15 @@ export function createSnapshotCommand(config: TigrisConfig) {
 	});
 }
 
-function parseInput(args: string[]): SnapshotInput | ExecResult {
+function parseInput(
+	args: string[],
+	cwd: string,
+	options: SnapshotOptions | undefined,
+): SnapshotInput | ExecResult {
 	const parsed = parseFlags(args, SCHEMA);
 	if ("error" in parsed) return argError("snapshot", parsed.error, USAGE);
 	const { flags, positional } = parsed;
 
-	if (positional.length === 0) return argError("snapshot", "missing <bucket>", USAGE);
 	if (positional.length > 1) {
 		return argError("snapshot", `unexpected argument: ${positional[1]}`, USAGE);
 	}
@@ -48,7 +56,12 @@ function parseInput(args: string[]): SnapshotInput | ExecResult {
 		return argError("snapshot", "--name and --list cannot be combined", USAGE);
 	}
 
-	return { bucket: positional[0] ?? "", mode: isList ? "list" : "create", name };
+	const bucket = positional[0] ?? options?.resolveBucket?.(cwd)?.bucket;
+	if (!bucket) {
+		return argError("snapshot", "missing <bucket> (cwd not in a mounted bucket)", USAGE);
+	}
+
+	return { bucket, mode: isList ? "list" : "create", name };
 }
 
 async function listSnapshots(bucket: string, config: TigrisConfig) {

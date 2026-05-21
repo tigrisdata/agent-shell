@@ -24,13 +24,21 @@ import { TEST_CONFIG_WITH_BUCKET } from "./helpers.js";
 const config = TEST_CONFIG_WITH_BUCKET;
 
 // Minimal CommandContext for testing
-function makeCtx() {
+function makeCtx(cwd = "/") {
 	return {
 		fs: {} as never,
-		cwd: "/",
+		cwd,
 		env: new Map<string, string>(),
 		stdin: EMPTY_BYTES,
 	};
+}
+
+// Resolves any path under /<bucket>/* to that bucket. Used to test the
+// cwd-bucket fallback in snapshot and fork.
+function stubResolveBucket(path: string): { bucket: string; key: string } | null {
+	const match = /^\/([^/]+)(?:\/(.*))?$/.exec(path);
+	if (!match) return null;
+	return { bucket: match[1] ?? "", key: match[2] ?? "" };
 }
 
 afterEach(() => {
@@ -88,6 +96,7 @@ describe("presign", () => {
 		expect(vi.mocked(getPresignedUrl)).toHaveBeenCalledWith("file.txt", {
 			operation: "get",
 			expiresIn: 3600,
+			accessKeyId: "tid_test",
 			config,
 		});
 	});
@@ -102,7 +111,49 @@ describe("presign", () => {
 		expect(vi.mocked(getPresignedUrl)).toHaveBeenCalledWith("file.txt", {
 			operation: "put",
 			expiresIn: 7200,
+			accessKeyId: "tid_test",
 			config,
+		});
+	});
+
+	it("--key overrides the configured access key", async () => {
+		vi.mocked(getPresignedUrl).mockResolvedValue({
+			data: { url: "https://example.com/signed", expiresIn: 3600, operation: "get" },
+		});
+
+		const result = await cmd.execute(["/file.txt", "--key", "tid_other"], makeCtx());
+		expect(result.exitCode).toBe(0);
+		expect(vi.mocked(getPresignedUrl)).toHaveBeenCalledWith(
+			"file.txt",
+			expect.objectContaining({ accessKeyId: "tid_other" }),
+		);
+	});
+
+	describe("OAuth session (no access key in config)", () => {
+		const oauthConfig: typeof config = {
+			sessionToken: "session_test",
+			organizationId: "org_test",
+			bucket: "test",
+		};
+		const oauthCmd = createPresignCommand(oauthConfig);
+
+		it("errors when --key is not provided", async () => {
+			const result = await oauthCmd.execute(["/file.txt"], makeCtx());
+			expect(result.exitCode).toBe(1);
+			expect(result.stderr).toContain("--key is required");
+		});
+
+		it("succeeds when --key is provided", async () => {
+			vi.mocked(getPresignedUrl).mockResolvedValue({
+				data: { url: "https://example.com/signed", expiresIn: 3600, operation: "get" },
+			});
+
+			const result = await oauthCmd.execute(["/file.txt", "--key", "tid_user"], makeCtx());
+			expect(result.exitCode).toBe(0);
+			expect(vi.mocked(getPresignedUrl)).toHaveBeenCalledWith(
+				"file.txt",
+				expect.objectContaining({ accessKeyId: "tid_user" }),
+			);
 		});
 	});
 
@@ -118,11 +169,38 @@ describe("presign", () => {
 describe("snapshot", () => {
 	const cmd = createSnapshotCommand(config);
 
-	it("returns error when bucket is missing", async () => {
+	it("returns error when bucket is missing and cwd not in a mount", async () => {
 		const result = await cmd.execute([], makeCtx());
 		expect(result.exitCode).toBe(1);
 		expect(result.stderr).toContain("missing <bucket>");
 		expect(result.stderr).toContain("Usage: snapshot");
+	});
+
+	it("falls back to cwd bucket when positional omitted", async () => {
+		const cmdWithResolve = createSnapshotCommand(config, { resolveBucket: stubResolveBucket });
+		vi.mocked(createBucketSnapshot).mockResolvedValue({
+			data: { snapshotVersion: "1713200000" },
+		});
+
+		const result = await cmdWithResolve.execute([], makeCtx("/my-bucket/sub"));
+		expect(result.exitCode).toBe(0);
+		expect(vi.mocked(createBucketSnapshot)).toHaveBeenCalledWith(
+			"my-bucket",
+			expect.objectContaining({ config }),
+		);
+	});
+
+	it("explicit bucket wins over cwd fallback", async () => {
+		const cmdWithResolve = createSnapshotCommand(config, { resolveBucket: stubResolveBucket });
+		vi.mocked(createBucketSnapshot).mockResolvedValue({
+			data: { snapshotVersion: "1713200000" },
+		});
+
+		await cmdWithResolve.execute(["explicit"], makeCtx("/my-bucket"));
+		expect(vi.mocked(createBucketSnapshot)).toHaveBeenCalledWith(
+			"explicit",
+			expect.objectContaining({ config }),
+		);
 	});
 
 	it("rejects unknown options", async () => {
@@ -204,40 +282,40 @@ describe("snapshot", () => {
 describe("fork", () => {
 	const cmd = createForkCommand(config);
 
-	it("returns error when source bucket is missing", async () => {
-		const result = await cmd.execute([], makeCtx());
+	it("returns error when neither --name nor --list is given", async () => {
+		const result = await cmd.execute(["source-only"], makeCtx());
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("either --name or --list is required");
+	});
+
+	it("returns error when source bucket is missing and cwd not in a mount", async () => {
+		const result = await cmd.execute(["--name", "fork-name"], makeCtx());
 		expect(result.exitCode).toBe(1);
 		expect(result.stderr).toContain("missing <source-bucket>");
 	});
 
-	it("returns error when fork name is missing", async () => {
-		const result = await cmd.execute(["source-only"], makeCtx());
-		expect(result.exitCode).toBe(1);
-		expect(result.stderr).toContain("missing <fork-name>");
-	});
-
 	it("rejects source == name", async () => {
-		const result = await cmd.execute(["same", "same"], makeCtx());
+		const result = await cmd.execute(["same", "--name", "same"], makeCtx());
 		expect(result.exitCode).toBe(1);
 		expect(result.stderr).toContain("must differ");
 	});
 
 	it("rejects unknown options", async () => {
-		const result = await cmd.execute(["a", "b", "--snap", "v"], makeCtx());
+		const result = await cmd.execute(["a", "--name", "b", "--snap", "v"], makeCtx());
 		expect(result.exitCode).toBe(1);
 		expect(result.stderr).toContain("unknown option: --snap");
 	});
 
 	it("rejects extra positional args", async () => {
-		const result = await cmd.execute(["a", "b", "c"], makeCtx());
+		const result = await cmd.execute(["a", "b", "--name", "fork"], makeCtx());
 		expect(result.exitCode).toBe(1);
-		expect(result.stderr).toContain("unexpected argument: c");
+		expect(result.stderr).toContain("unexpected argument: b");
 	});
 
 	it("creates a fork", async () => {
 		vi.mocked(createBucket).mockResolvedValue({ data: {} as never });
 
-		const result = await cmd.execute(["source-bucket", "my-fork"], makeCtx());
+		const result = await cmd.execute(["source-bucket", "--name", "my-fork"], makeCtx());
 		expect(result.exitCode).toBe(0);
 		expect(result.stdout.trim()).toBe("my-fork");
 		expect(vi.mocked(createBucket)).toHaveBeenCalledWith("my-fork", {
@@ -249,7 +327,7 @@ describe("fork", () => {
 	it("creates a fork from a snapshot", async () => {
 		vi.mocked(createBucket).mockResolvedValue({ data: {} as never });
 
-		await cmd.execute(["source", "fork-name", "--snapshot", "1713200000"], makeCtx());
+		await cmd.execute(["source", "--name", "fork-name", "--snapshot", "1713200000"], makeCtx());
 		expect(vi.mocked(createBucket)).toHaveBeenCalledWith("fork-name", {
 			sourceBucketName: "source",
 			sourceBucketSnapshot: "1713200000",
@@ -257,19 +335,39 @@ describe("fork", () => {
 		});
 	});
 
+	it("falls back to cwd bucket for source when omitted", async () => {
+		const cmdWithResolve = createForkCommand(config, { resolveBucket: stubResolveBucket });
+		vi.mocked(createBucket).mockResolvedValue({ data: {} as never });
+
+		await cmdWithResolve.execute(["--name", "new-fork"], makeCtx("/my-bucket/sub"));
+		expect(vi.mocked(createBucket)).toHaveBeenCalledWith(
+			"new-fork",
+			expect.objectContaining({ sourceBucketName: "my-bucket" }),
+		);
+	});
+
 	it("returns error on SDK failure", async () => {
 		vi.mocked(createBucket).mockResolvedValue({ error: new Error("already exists") });
 
-		const result = await cmd.execute(["source", "fork"], makeCtx());
+		const result = await cmd.execute(["source", "--name", "fork"], makeCtx());
 		expect(result.exitCode).toBe(1);
 		expect(result.stderr).toContain("already exists");
 	});
 
 	describe("--list", () => {
-		it("returns error when source bucket is missing", async () => {
+		it("returns error when source bucket is missing and cwd not in a mount", async () => {
 			const result = await cmd.execute(["--list"], makeCtx());
 			expect(result.exitCode).toBe(1);
 			expect(result.stderr).toContain("missing <source-bucket>");
+		});
+
+		it("falls back to cwd bucket when source omitted", async () => {
+			const cmdWithResolve = createForkCommand(config, { resolveBucket: stubResolveBucket });
+			vi.mocked(listForks).mockResolvedValue({ data: { forks: [] } });
+
+			const result = await cmdWithResolve.execute(["--list"], makeCtx("/my-bucket"));
+			expect(result.exitCode).toBe(0);
+			expect(vi.mocked(listForks)).toHaveBeenCalledWith("my-bucket", expect.anything());
 		});
 
 		it("rejects extra positional args", async () => {
@@ -282,6 +380,12 @@ describe("fork", () => {
 			const result = await cmd.execute(["a", "--list", "--snapshot", "v1"], makeCtx());
 			expect(result.exitCode).toBe(1);
 			expect(result.stderr).toContain("--snapshot and --list cannot be combined");
+		});
+
+		it("rejects --name + --list", async () => {
+			const result = await cmd.execute(["a", "--list", "--name", "x"], makeCtx());
+			expect(result.exitCode).toBe(1);
+			expect(result.stderr).toContain("--name and --list cannot be combined");
 		});
 
 		it("prints 'No forks.' when listing is empty", async () => {

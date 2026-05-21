@@ -3,10 +3,11 @@ import { defineCommand, type ExecResult } from "just-bash";
 import type { TigrisConfig } from "../types.js";
 import { argError, type FlagSchema, parseFlags, sdkError } from "./args.js";
 
-const USAGE = "presign <path> [--expires N] [--put]";
+const USAGE = "presign <path> [--expires N] [--put] [--key accessKeyId]";
 const SCHEMA: FlagSchema = {
 	"--expires": "value",
 	"--put": "boolean",
+	"--key": "value",
 };
 const DEFAULT_EXPIRES = 3600;
 
@@ -19,6 +20,7 @@ interface PresignInput {
 	path: string;
 	expiresIn: number;
 	operation: "get" | "put";
+	accessKeyOverride: string | undefined;
 }
 
 export function createPresignCommand(config: TigrisConfig, options?: PresignOptions) {
@@ -26,8 +28,9 @@ export function createPresignCommand(config: TigrisConfig, options?: PresignOpti
 		const input = parseInput(args);
 		if ("stderr" in input) return input;
 
-		if (!config.accessKeyId) {
-			return argError("presign", "requires access key auth. Use 'configure' instead of 'login'.");
+		const accessKeyId = input.accessKeyOverride ?? config.accessKeyId;
+		if (!accessKeyId) {
+			return argError("presign", "--key is required when logged in via 'login'", USAGE);
 		}
 
 		const resolved = resolveTarget(input.path, ctx.cwd, config, options);
@@ -38,6 +41,7 @@ export function createPresignCommand(config: TigrisConfig, options?: PresignOpti
 		const result = await getPresignedUrl(resolved.key, {
 			operation: input.operation,
 			expiresIn: input.expiresIn,
+			accessKeyId,
 			config: { ...config, bucket: resolved.bucket },
 		});
 		if ("error" in result) return sdkError("presign", result.error);
@@ -63,6 +67,7 @@ function parseInput(args: string[]): PresignInput | ExecResult {
 		path: positional[0] ?? "",
 		expiresIn: expires,
 		operation: flags["--put"] === true ? "put" : "get",
+		accessKeyOverride: typeof flags["--key"] === "string" ? flags["--key"] : undefined,
 	};
 }
 
