@@ -1,3 +1,16 @@
+> [!IMPORTANT]
+> **This repository has moved to the Tigris monorepo.**
+> `@tigrisdata/agent-shell` now lives at **[tigrisdata/storage](https://github.com/tigrisdata/storage)** under
+> [`packages/agent-shell`](https://github.com/tigrisdata/storage/tree/main/packages/agent-shell)
+> (the playground is at [`apps/agent-shell-playground`](https://github.com/tigrisdata/storage/tree/main/apps/agent-shell-playground)).
+> All development, issues, and releases continue there.
+>
+> This repository is **archived and read-only**. The npm package
+> [`@tigrisdata/agent-shell`](https://www.npmjs.com/package/@tigrisdata/agent-shell) is unaffected
+> and continues to publish from the monorepo.
+
+---
+
 # @tigrisdata/agent-shell
 
 A virtual bash environment with a persistent filesystem backed by Tigris object storage, written in TypeScript and designed for AI agents.
